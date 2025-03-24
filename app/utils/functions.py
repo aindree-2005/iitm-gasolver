@@ -293,3 +293,191 @@ async def clean_sales_data_and_calculate_margin(file_path: str, cutoff_date_str:
     
     except Exception as e:
         return f"Error processing sales data: {e}"
+async def analyze_sentiment(text: str, api_key: str = "dummy_api_key") -> str:
+    """
+    Analyze sentiment of text using OpenAI API
+    """
+    import httpx
+    import json
+
+    url = "https://api.openai.com/v1/chat/completions"
+
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+
+    payload = {
+        "model": "gpt-4o-mini",
+        "messages": [
+            {
+                "role": "system",
+                "content": "Analyze the sentiment of the following text and classify it as GOOD, BAD, or NEUTRAL.",
+            },
+            {"role": "user", "content": text},
+        ],
+    }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload, headers=headers)
+            response.raise_for_status()
+            result = response.json()
+
+            # Extract the sentiment analysis result
+            sentiment = result["choices"][0]["message"]["content"]
+
+            return f"""
+# Sentiment Analysis Result
+
+## Input Text
+
+## Analysis
+{sentiment}
+
+## API Request Details
+- Model: gpt-4o-mini
+- API Endpoint: {url}
+- Request Type: POST
+"""
+    except Exception as e:
+        return f"Error analyzing sentiment: {str(e)}"
+async def calculate_statistics(file_path: str, operation: str, column_name: str) -> str:
+    """
+    Calculate statistics from a CSV file.
+    """
+    try:
+        # Read the CSV file
+        df = pd.read_csv(file_path)
+
+        # Verify that the column exists
+        if column_name not in df.columns:
+            return f"Column '{column_name}' not found in the CSV file."
+
+        # Perform the requested operation
+        if operation == "sum":
+            result = df[column_name].sum()
+        elif operation == "average":
+            result = df[column_name].mean()
+        elif operation == "median":
+            result = df[column_name].median()
+        elif operation == "max":
+            result = df[column_name].max()
+        elif operation == "min":
+            result = df[column_name].min()
+        else:
+            return f"Unsupported operation: {operation}"
+
+        return str(result)
+
+    except Exception as e:
+        return f"Error calculating statistics: {str(e)}"
+
+
+def sort_json_array(json_array: str, sort_keys: list) -> str:
+    """
+    Sort a JSON array based on specified criteria
+
+    Args:
+        json_array: JSON array as a string
+        sort_keys: List of keys to sort by
+
+    Returns:
+        Sorted JSON array as a string
+    """
+    try:
+        # Parse the JSON array
+        data = json.loads(json_array)
+
+        # Sort the data based on the specified keys
+        for key in reversed(sort_keys):
+            data = sorted(data, key=lambda x: x.get(key, ""))
+
+        # Return the sorted JSON as a string without whitespace
+        return json.dumps(data, separators=(",", ":"))
+
+    except Exception as e:
+        return f"Error sorting JSON array: {str(e)}"
+
+async def find_most_similar_phrases(embeddings_dict: Dict[str, List[float]]) -> str:
+    """
+    Find the most similar pair of phrases based on cosine similarity of their embeddings
+
+    Args:
+        embeddings_dict: Dictionary mapping phrases to their embeddings
+
+    Returns:
+        The most similar pair of phrases
+    """
+    try:
+        import numpy as np
+        from itertools import combinations
+
+        # Function to calculate cosine similarity
+        def cosine_similarity(vec1, vec2):
+            dot_product = np.dot(vec1, vec2)
+            norm_vec1 = np.linalg.norm(vec1)
+            norm_vec2 = np.linalg.norm(vec2)
+            return dot_product / (norm_vec1 * norm_vec2)
+
+        # Convert dictionary to lists for easier processing
+        phrases = list(embeddings_dict.keys())
+        embeddings = list(embeddings_dict.values())
+
+        # Calculate similarity for each pair
+        max_similarity = -1
+        most_similar_pair = None
+
+        for i, j in combinations(range(len(phrases)), 2):
+            similarity = cosine_similarity(embeddings[i], embeddings[j])
+            if similarity > max_similarity:
+                max_similarity = similarity
+                most_similar_pair = (phrases[i], phrases[j])
+
+        # Generate Python code for the solution
+        solution_code = """
+def most_similar(embeddings):
+    \"\"\"
+    Find the most similar pair of phrases based on cosine similarity of their embeddings.
+    
+    Args:
+        embeddings: Dictionary mapping phrases to their embeddings
+        
+    Returns:
+        Tuple of the two most similar phrases
+    \"\"\"
+    import numpy as np
+    from itertools import combinations
+
+    # Function to calculate cosine similarity
+    def cosine_similarity(vec1, vec2):
+        dot_product = np.dot(vec1, vec2)
+        norm_vec1 = np.linalg.norm(vec1)
+        norm_vec2 = np.linalg.norm(vec2)
+        return dot_product / (norm_vec1 * norm_vec2)
+
+    # Convert dictionary to lists for easier processing
+    phrases = list(embeddings.keys())
+    embeddings_list = list(embeddings.values())
+
+    # Calculate similarity for each pair
+    max_similarity = -1
+    most_similar_pair = None
+
+    for i, j in combinations(range(len(phrases)), 2):
+        similarity = cosine_similarity(embeddings_list[i], embeddings_list[j])
+        if similarity > max_similarity:
+            max_similarity = similarity
+            most_similar_pair = (phrases[i], phrases[j])
+
+    return most_similar_pair
+"""
+
+        return f"""
+# Most Similar Phrases Analysis
+
+## Result
+The most similar pair of phrases is: {most_similar_pair[0]} and {most_similar_pair[1]}
+Similarity score: {max_similarity:.4f}
+
+## Python Solution
+```python
+{solution_code}
+```

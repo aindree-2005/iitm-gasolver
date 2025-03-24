@@ -117,6 +117,7 @@ async def get_openai_response(question: str, file_path: Optional[str] = None) ->
                     "required": ["start_date", "end_date", "day_of_week"],
                 },
             },
+            
         },
     ]
 
