@@ -24,7 +24,101 @@ async def get_openai_response(question: str, file_path: Optional[str] = None) ->
         "Content-Type": "application/json",
         "Authorization": f"Bearer {AIPROXY_TOKEN}",
     }
-    functions = []
+    functions = [
+        {
+            "type": "function",
+            "function": {
+                "name": "execute_command",
+                "description": "Execute a shell command and return its output",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "description": "The command to execute",
+                        }
+                    },
+                    "required": ["command"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "extract_zip_and_read_csv",
+                "description": "Extract a zip file and read a value from a CSV file inside it",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "file_path": {
+                            "type": "string",
+                            "description": "Path to the zip file",
+                        },
+                        "column_name": {
+                            "type": "string",
+                            "description": "Column name to extract value from",
+                        },
+                    },
+                    "required": ["file_path"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "extract_zip_and_process_files",
+                "description": "Extract a zip file and process multiple files",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "file_path": {
+                            "type": "string",
+                            "description": "Path to the zip file",
+                        },
+                        "operation": {
+                            "type": "string",
+                            "description": "Operation to perform on files",
+                        },
+                    },
+                    "required": ["file_path", "operation"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "count_days_of_week",
+                "description": "Count occurrences of a specific day of the week between two dates",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "start_date": {
+                            "type": "string",
+                            "description": "Start date in ISO format (YYYY-MM-DD)",
+                        },
+                        "end_date": {
+                            "type": "string",
+                            "description": "End date in ISO format (YYYY-MM-DD)",
+                        },
+                        "day_of_week": {
+                            "type": "string",
+                            "enum": [
+                                "Monday",
+                                "Tuesday",
+                                "Wednesday",
+                                "Thursday",
+                                "Friday",
+                                "Saturday",
+                                "Sunday",
+                            ],
+                            "description": "Day of the week to count",
+                        },
+                    },
+                    "required": ["start_date", "end_date", "day_of_week"],
+                },
+            },
+        },
+    ]
 
     messages = [
         {

@@ -235,3 +235,61 @@ def count_days_of_week(start_date: str, end_date: str, day_of_week: str) -> str:
         return str(count)
     except Exception as e:
         return f"Error counting days of week: {str(e)}"
+import pandas as pd
+import re
+import shutil
+import tempfile
+import zipfile
+from datetime import datetime
+import dateutil.parser
+
+async def clean_sales_data_and_calculate_margin(file_path: str, cutoff_date_str: str, product_filter: str, country_filter: str) -> str:
+    try:
+        # Parse cutoff date
+        try:
+            date_match = re.search(r"([A-Za-z]+ [A-Za-z]+ \d+ \d+ \d+:\d+:\d+)", cutoff_date_str)
+            cutoff_date = datetime.strptime(date_match.group(1), "%a %b %d %Y %H:%M:%S") if date_match else dateutil.parser.parse(cutoff_date_str)
+        except Exception as e:
+            return f"Error parsing date: {e}"
+
+        # Read Excel file
+        df = pd.read_excel(file_path)
+        col_map = {
+            "customer": ["customer", "client", "buyer"],
+            "country": ["country", "nation", "region"],
+            "date": ["date", "transaction date", "sale date"],
+            "product": ["product", "item", "goods"],
+            "sales": ["sales", "revenue", "amount"],
+            "cost": ["cost", "expense", "purchase price"],
+        }
+        
+        # Map columns
+        mapped_cols = {key: next((col for col in df.columns if col.lower() in [x.lower() for x in names]), None) for key, names in col_map.items()}
+        if any(v is None for k, v in mapped_cols.items() if k in ["date", "product", "country", "sales", "cost"]):
+            return "Error: Missing required columns."
+
+        df = df.rename(columns=mapped_cols)
+
+        # Standardize country names
+        country_map = {"usa": "US", "united states": "US", "uk": "UK", "united kingdom": "UK", "france": "FR", "brazil": "BR", "india": "IN"}
+        df["country"] = df["country"].str.strip().str.lower().map(lambda x: country_map.get(x, x.upper()))
+
+        # Parse dates
+        df["date"] = df["date"].apply(lambda x: dateutil.parser.parse(str(x)) if pd.notna(x) else None)
+
+        # Clean numeric columns
+        df["sales"] = pd.to_numeric(df["sales"].astype(str).str.replace(r"[^\d.]", "", regex=True), errors="coerce")
+        df["cost"] = pd.to_numeric(df["cost"].astype(str).str.replace(r"[^\d.]", "", regex=True), errors="coerce")
+        df["cost"].fillna(df["sales"] * 0.5, inplace=True)
+
+        # Filter data
+        df = df[(df["date"] <= cutoff_date) & (df["product"].str.lower() == product_filter.lower()) & (df["country"].str.lower() == country_filter.lower())]
+
+        if df.empty:
+            return "0.0000"
+
+        margin = (df["sales"].sum() - df["cost"].sum()) / df["sales"].sum() if df["sales"].sum() else 0
+        return f"{margin:.4f}"
+    
+    except Exception as e:
+        return f"Error processing sales data: {e}"
