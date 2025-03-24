@@ -481,3 +481,13 @@ Similarity score: {max_similarity:.4f}
 ```python
 {solution_code}
 ```
+
+## Explanation
+This function:
+
+1. Calculates the cosine similarity between each pair of embeddings
+2. Identifies the pair with the highest similarity score
+3. Returns the two phrases as a tuple
+"""
+    except Exception as e:
+        return f"Error finding most similar phrases: {str(e)}"
