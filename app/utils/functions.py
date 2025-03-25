@@ -968,3 +968,82 @@ async def setup_llamafile_with_ngrok(
         return instructions
     except Exception as e:
         return f"Error generating Llamafile setup instructions: {str(e)}"
+async def find_duckdb_hn_post() -> str:
+    """
+    Find the latest Hacker News post mentioning DuckDB with at least 71 points
+
+    Returns:
+        Information about the post and its link
+    """
+    try:
+        import httpx
+        import xml.etree.ElementTree as ET
+
+        # HNRSS API endpoint for searching posts with minimum points
+        url = "https://hnrss.org/newest"
+
+        # Parameters for the request
+        params = {"q": "DuckDB", "points": "71"}  # Search term  # Minimum points
+
+        async with httpx.AsyncClient() as client:
+            # Make the request
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+            rss_content = response.text
+
+            # Parse the XML content
+            root = ET.fromstring(rss_content)
+
+            # Find all items in the RSS feed
+            items = root.findall(".//item")
+
+            if not items:
+                return "No Hacker News posts found mentioning DuckDB with at least 71 points"
+
+            # Get the first (most recent) item
+            latest_item = items[0]
+
+            # Extract information from the item
+            title = (
+                latest_item.find("title").text
+                if latest_item.find("title") is not None
+                else "No title"
+            )
+            link = (
+                latest_item.find("link").text
+                if latest_item.find("link") is not None
+                else "No link"
+            )
+            pub_date = (
+                latest_item.find("pubDate").text
+                if latest_item.find("pubDate") is not None
+                else "No date"
+            )
+
+            # Create a detailed response
+            return f"""
+# Latest Hacker News Post About DuckDB
+
+## Post Information
+- Title: {title}
+- Publication Date: {pub_date}
+- Link: **{link}**
+
+## Search Criteria
+- Keyword: DuckDB
+- Minimum Points: 71
+
+## API Details
+- API: Hacker News RSS
+- Endpoint: {url}
+- Parameters: {params}
+
+## Usage Notes
+This data can be used for:
+- Tracking industry trends
+- Monitoring technology discussions
+- Gathering competitive intelligence
+"""
+    except Exception as e:
+        return f"Error finding DuckDB Hacker News post: {str(e)}"
+
