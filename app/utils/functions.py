@@ -2902,4 +2902,158 @@ This analysis shows the number of requests that match all specified criteria in 
 
         return f"Error analyzing Apache logs: {str(e)}\n{traceback.format_exc()}"
 
+async def parse_function_call(query: str) -> str:
+    """
+    Parse a natural language query to determine which function to call and extract parameters
 
+    Args:
+        query: Natural language query
+
+    Returns:
+        JSON response with function name and arguments
+    """
+    try:
+        import re
+        import json
+
+        # Define regex patterns for each function
+        ticket_pattern = r"status of ticket (\d+)"
+        meeting_pattern = (
+            r"Schedule a meeting on (\d{4}-\d{2}-\d{2}) at (\d{2}:\d{2}) in (Room \w+)"
+        )
+        expense_pattern = r"expense balance for employee (\d+)"
+        bonus_pattern = r"Calculate performance bonus for employee (\d+) for (\d{4})"
+        issue_pattern = r"Report office issue (\d+) for the (\w+) department"
+
+        # Check each pattern and extract parameters
+        if re.search(ticket_pattern, query):
+            ticket_id = int(re.search(ticket_pattern, query).group(1))
+            function_name = "get_ticket_status"
+            arguments = {"ticket_id": ticket_id}
+
+        elif re.search(meeting_pattern, query):
+            match = re.search(meeting_pattern, query)
+            date = match.group(1)
+            time = match.group(2)
+            meeting_room = match.group(3)
+            function_name = "schedule_meeting"
+            arguments = {"date": date, "time": time, "meeting_room": meeting_room}
+
+        elif re.search(expense_pattern, query):
+            employee_id = int(re.search(expense_pattern, query).group(1))
+            function_name = "get_expense_balance"
+            arguments = {"employee_id": employee_id}
+
+        elif re.search(bonus_pattern, query):
+            match = re.search(bonus_pattern, query)
+            employee_id = int(match.group(1))
+            current_year = int(match.group(2))
+            function_name = "calculate_performance_bonus"
+            arguments = {"employee_id": employee_id, "current_year": current_year}
+
+        elif re.search(issue_pattern, query):
+            match = re.search(issue_pattern, query)
+            issue_code = int(match.group(1))
+            department = match.group(2)
+            function_name = "report_office_issue"
+            arguments = {"issue_code": issue_code, "department": department}
+
+        else:
+            return "Could not match query to any known function pattern."
+
+        # Create the response
+        response = {"name": function_name, "arguments": json.dumps(arguments)}
+
+        # Create FastAPI implementation code
+        fastapi_code = """
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+import re
+import json
+
+app = FastAPI()
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=True,
+    allow_methods=["GET"],  # Allow GET method
+    allow_headers=["*"],  # Allow all headers
+)
+
+@app.get("/execute")
+async def execute_query(q: str):
+    # Define regex patterns for each function
+    ticket_pattern = r"status of ticket (\d+)"
+    meeting_pattern = r"Schedule a meeting on (\d{4}-\d{2}-\d{2}) at (\d{2}:\d{2}) in (Room \w+)"
+    expense_pattern = r"expense balance for employee (\d+)"
+    bonus_pattern = r"Calculate performance bonus for employee (\d+) for (\d{4})"
+    issue_pattern = r"Report office issue (\d+) for the (\w+) department"
+    
+    # Check each pattern and extract parameters
+    if re.search(ticket_pattern, q):
+        ticket_id = int(re.search(ticket_pattern, q).group(1))
+        function_name = "get_ticket_status"
+        arguments = {"ticket_id": ticket_id}
+
+    elif re.search(meeting_pattern, q):
+        match = re.search(meeting_pattern, q)
+        date = match.group(1)
+        time = match.group(2)
+        meeting_room = match.group(3)
+        function_name = "schedule_meeting"
+        arguments = {"date": date, "time": time, "meeting_room": meeting_room}
+
+    elif re.search(expense_pattern, q):
+        employee_id = int(re.search(expense_pattern, q).group(1))
+        function_name = "get_expense_balance"
+        arguments = {"employee_id": employee_id}
+
+    elif re.search(bonus_pattern, q):
+        match = re.search(bonus_pattern, q)
+        employee_id = int(match.group(1))
+        current_year = int(match.group(2))
+        function_name = "calculate_performance_bonus"
+        arguments = {"employee_id": employee_id, "current_year": current_year}
+
+    elif re.search(issue_pattern, q):
+        match = re.search(issue_pattern, q)
+        issue_code = int(match.group(1))
+        department = match.group(2)
+        function_name = "report_office_issue"
+        arguments = {"issue_code": issue_code, "department": department}
+
+    else:
+        raise HTTPException(status_code=400, detail="Could not match query to any known function pattern")
+
+    # Return the function name and arguments
+    return {
+        "name": function_name,
+        "arguments": json.dumps(arguments)
+    }
+"""
+
+        return f"""
+# Function Call Parser
+## Query
+"{query}"
+
+## Parsed Function Call
+- Function: {function_name}
+- Arguments: {json.dumps(arguments, indent=2)}
+## FastAPI Implementation
+```python
+{fastapi_code}
+```
+## API Endpoint
+http://127.0.0.1:8000/execute
+
+## Example Request
+GET http://127.0.0.1:8000/execute?q={query.replace(" ", "%20")}
+
+## Example Response
+{json.dumps(response, indent=2)}
+"""
+    except Exception as e:
+        return f"Error parsing function call: {str(e)}"
