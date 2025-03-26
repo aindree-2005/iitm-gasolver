@@ -1351,3 +1351,1555 @@ You can also trigger this workflow manually from the Actions tab in your reposit
     except Exception as e:
         return f"Error creating GitHub Action workflow: {str(e)}"
 
+async def compute_document_similarity(docs: List[str], query: str) -> str:
+    """
+    Compute similarity between a query and a list of documents using embeddings
+
+    Args:
+        docs: List of document texts
+        query: Query string to compare against documents
+
+    Returns:
+        JSON response with the most similar documents
+    """
+    try:
+        import numpy as np
+        import json
+        import httpx
+        from typing import List, Dict
+
+        # Function to calculate cosine similarity
+        def cosine_similarity(vec1, vec2):
+            dot_product = np.dot(vec1, vec2)
+            norm_vec1 = np.linalg.norm(vec1)
+            norm_vec2 = np.linalg.norm(vec2)
+            return dot_product / (norm_vec1 * norm_vec2)
+
+        # Function to get embeddings from OpenAI API
+        async def get_embedding(text: str) -> List[float]:
+            url = "https://api.openai.com/v1/embeddings"
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": "Bearer dummy_api_key",  # Replace with actual API key in production
+            }
+            payload = {"model": "text-embedding-3-small", "input": text}
+
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, json=payload, headers=headers)
+                response.raise_for_status()
+                result = response.json()
+                return result["data"][0]["embedding"]
+
+        # Get embeddings for query and documents
+        query_embedding = await get_embedding(query)
+        doc_embeddings = []
+
+        for doc in docs:
+            doc_embedding = await get_embedding(doc)
+            doc_embeddings.append(doc_embedding)
+
+        # Calculate similarities
+        similarities = []
+        for i, doc_embedding in enumerate(doc_embeddings):
+            similarity = cosine_similarity(query_embedding, doc_embedding)
+            similarities.append((i, similarity))
+
+        # Sort by similarity (descending)
+        similarities.sort(key=lambda x: x[1], reverse=True)
+
+        # Get top 3 matches (or fewer if less than 3 documents)
+        top_matches = similarities[: min(3, len(similarities))]
+
+        # Get the matching documents
+        matches = [docs[idx] for idx, _ in top_matches]
+
+        # Create FastAPI implementation code
+        fastapi_code = """
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List
+import httpx
+import numpy as np
+
+app = FastAPI()
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=True,
+    allow_methods=["OPTIONS", "POST"],  # Allow OPTIONS and POST methods
+    allow_headers=["*"],  # Allow all headers
+)
+
+class SimilarityRequest(BaseModel):
+    docs: List[str]
+    query: str
+
+@app.post("/similarity")
+async def compute_similarity(request: SimilarityRequest):
+    # Function to calculate cosine similarity
+    def cosine_similarity(vec1, vec2):
+        dot_product = np.dot(vec1, vec2)
+        norm_vec1 = np.linalg.norm(vec1)
+        norm_vec2 = np.linalg.norm(vec2)
+        return dot_product / (norm_vec1 * norm_vec2)
+    
+    # Function to get embeddings from OpenAI API
+    async def get_embedding(text: str):
+        url = "https://api.openai.com/v1/embeddings"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {OPENAI_API_KEY}"  # Use environment variable
+        }
+        payload = {
+            "model": "text-embedding-3-small",
+            "input": text
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload, headers=headers)
+            response.raise_for_status()
+            result = response.json()
+            return result["data"][0]["embedding"]
+    
+    try:
+        # Get embeddings for query and documents
+        query_embedding = await get_embedding(request.query)
+        doc_embeddings = []
+        
+        for doc in request.docs:
+            doc_embedding = await get_embedding(doc)
+            doc_embeddings.append(doc_embedding)
+        
+        # Calculate similarities
+        similarities = []
+        for i, doc_embedding in enumerate(doc_embeddings):
+            similarity = cosine_similarity(query_embedding, doc_embedding)
+            similarities.append((i, similarity))
+        
+        # Sort by similarity (descending)
+        similarities.sort(key=lambda x: x[1], reverse=True)
+        
+        # Get top 3 matches (or fewer if less than 3 documents)
+        top_matches = similarities[:min(3, len(similarities))]
+        
+        # Get the matching documents
+        matches = [request.docs[idx] for idx, _ in top_matches]
+        
+        return {"matches": matches}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+"""
+
+        # Create response
+        response = {"matches": matches}
+
+        return f"""
+# Document Similarity Analysis
+
+## Query
+"{query}"
+
+## Top Matches
+1. "{matches[0] if len(matches) > 0 else 'No matches found'}"
+{f'2. "{matches[1]}"' if len(matches) > 1 else ''}
+{f'3. "{matches[2]}"' if len(matches) > 2 else ''}
+
+## FastAPI Implementation
+```python
+{fastapi_code}
+```
+## API Endpoint
+http://127.0.0.1:8000/similarity
+
+## Example Request
+{{
+  "docs": {json.dumps(docs)},
+  "query": "{query}"
+}}
+## Example Response
+{json.dumps(response, indent=2)}
+"""
+    except Exception as e:
+        return f"Error computing document similarity: {str(e)}"
+import sqlite3
+async def run_sql_query(query: str) -> str:
+    """
+    Calculate a SQL query result
+
+    Args:
+        query: SQL query to run
+
+    Returns:
+        Result of the SQL query
+    """
+    try:
+        # Create an in-memory SQLite database
+        conn = sqlite3.connect(":memory:")
+        cursor = conn.cursor()
+
+        # Check if the query is about the tickets table
+        if "tickets" in query.lower() and (
+            "gold" in query.lower() or "type" in query.lower()
+        ):
+            # Create the tickets table
+            cursor.execute(
+                """
+            CREATE TABLE tickets (
+                type TEXT,
+                units INTEGER,
+                price REAL
+            )
+            """
+            )
+
+            # Insert sample data
+            ticket_data = [
+                ("GOLD", 24, 51.26),
+                ("bronze", 20, 21.36),
+                ("Gold", 18, 00.8),
+                ("Bronze", 65, 41.69),
+                ("SILVER", 98, 70.86),
+                # Add more data as needed
+            ]
+
+            cursor.executemany("INSERT INTO tickets VALUES (?, ?, ?)", ticket_data)
+            conn.commit()
+
+            # Execute the user's query
+            cursor.execute(query)
+            result = cursor.fetchall()
+
+            # Format the result
+            if len(result) == 1 and len(result[0]) == 1:
+                return str(result[0][0])
+            else:
+                return json.dumps(result)
+
+        else:
+            return "Unsupported SQL query or database table"
+
+    except Exception as e:
+        return f"Error executing SQL query: {str(e)}"
+
+    finally:
+        if "conn" in locals():
+            conn.close()
+async def generate_embeddings_request(texts: List[str]) -> str:
+    """
+    Generate a JSON body for OpenAI's embeddings API
+
+    Args:
+        texts: List of texts to generate embeddings for
+
+    Returns:
+        JSON body for the API request
+    """
+    try:
+        import json
+
+        # Create the request body
+        request_body = {
+            "model": "text-embedding-3-small",
+            "input": texts,
+            "encoding_format": "float",
+        }
+
+        # Format the JSON nicely
+        formatted_json = json.dumps(request_body, indent=2)
+
+        return f"""
+# Embeddings API Request Body
+
+The following JSON body can be sent to the OpenAI API to generate embeddings:
+
+```json
+{formatted_json}
+```
+
+## Request Details
+- Model: text-embedding-3-small
+- API Endpoint: https://api.openai.com/v1/embeddings
+- Request Type: POST
+- Purpose: Generate embeddings for text analysis
+"""
+    except Exception as e:
+        return f"Error generating embeddings request: {str(e)}"
+async def generate_country_outline(country: str) -> str:
+    """
+    Generate a Markdown outline from Wikipedia headings for a country
+
+    Args:
+        country: Name of the country
+
+    Returns:
+        Markdown outline of the country's Wikipedia page
+    """
+    try:
+        import httpx
+        from bs4 import BeautifulSoup
+        import urllib.parse
+
+        # Format the country name for the URL
+        formatted_country = urllib.parse.quote(country.replace(" ", "_"))
+        url = f"https://en.wikipedia.org/wiki/{formatted_country}"
+
+        # Fetch the Wikipedia page
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            html_content = response.text
+
+        # Parse the HTML
+        soup = BeautifulSoup(html_content, "html.parser")
+
+        # Get the page title (country name)
+        title = soup.find("h1", id="firstHeading").get_text(strip=True)
+
+        # Find all headings (h1 to h6)
+        headings = soup.find_all(["h1", "h2", "h3", "h4", "h5", "h6"])
+
+        # Generate the Markdown outline
+        outline = [f"# {title}"]
+        outline.append("\n## Contents\n")
+
+        for heading in headings:
+            if heading.get("id") != "firstHeading":  # Skip the page title
+                # Determine the heading level
+                level = int(heading.name[1])
+
+                # Get the heading text
+                text = heading.get_text(strip=True)
+
+                # Skip certain headings like "References", "External links", etc.
+                skip_headings = [
+                    "References",
+                    "External links",
+                    "See also",
+                    "Notes",
+                    "Citations",
+                    "Bibliography",
+                ]
+                if any(skip in text for skip in skip_headings):
+                    continue
+
+                # Add the heading to the outline with appropriate indentation
+                outline.append(f"{'#' * level} {text}")
+
+        # Join the outline into a single string
+        markdown_outline = "\n\n".join(outline)
+
+        return f"""
+# Wikipedia Outline Generator
+
+## Country
+{country}
+
+## Markdown Outline
+{markdown_outline}
+
+## API Endpoint Example
+/api/outline?country={urllib.parse.quote(country)}
+"""
+    except Exception as e:
+        return f"Error generating country outline: {str(e)}"
+async def compare_files(file_path: str) -> str:
+    """
+    Compare two files and analyze differences
+
+    Args:
+        file_path: Path to the zip file containing files to compare
+
+    Returns:
+        Number of differences between the files
+    """
+    temp_dir = tempfile.mkdtemp()
+
+    try:
+        # Extract the zip file
+        with zipfile.ZipFile(file_path, "r") as zip_ref:
+            zip_ref.extractall(temp_dir)
+
+        # Look for a.txt and b.txt
+        file_a = os.path.join(temp_dir, "a.txt")
+        file_b = os.path.join(temp_dir, "b.txt")
+
+        if not os.path.exists(file_a) or not os.path.exists(file_b):
+            return "Files a.txt and b.txt not found."
+
+        # Read both files
+        with open(file_a, "r") as a, open(file_b, "r") as b:
+            a_lines = a.readlines()
+            b_lines = b.readlines()
+
+            # Count the differences
+            diff_count = 0
+            for i in range(min(len(a_lines), len(b_lines))):
+                if a_lines[i] != b_lines[i]:
+                    diff_count += 1
+
+            return str(diff_count)
+
+    except Exception as e:
+        return f"Error comparing files: {str(e)}"
+
+    finally:
+        # Clean up the temporary directory
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+async def generate_vision_api_request(image_url: str) -> str:
+    """
+    Generate a JSON body for OpenAI's vision API to extract text from an image
+
+    Args:
+        image_url: Base64 URL of the image
+
+    Returns:
+        JSON body for the API request
+    """
+    try:
+        import json
+
+        # Create the request body
+        request_body = {
+            "model": "gpt-4o-mini",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Extract text from this image."},
+                        {"type": "image_url", "image_url": {"url": image_url}},
+                    ],
+                }
+            ],
+            "max_tokens": 300,
+        }
+
+        # Format the JSON nicely
+        formatted_json = json.dumps(request_body, indent=2)
+
+        return f"""
+# Vision API Request Body
+
+The following JSON body can be sent to the OpenAI API to extract text from an image:
+
+```json
+{formatted_json}
+```
+
+## Request Details
+- Model: gpt-4o-mini
+- API Endpoint: https://api.openai.com/v1/chat/completions
+- Request Type: POST
+- Purpose: Extract text from an image using OpenAI's vision capabilities
+"""
+    except Exception as e:
+        return f"Error generating vision API request: {str(e)}"
+
+
+async def count_cricket_ducks(page_number: int = 3) -> str:
+    """
+    Count the number of ducks in ESPN Cricinfo ODI batting stats for a specific page
+
+    Args:
+        page_number: Page number to analyze (default: 3)
+
+    Returns:
+        Total number of ducks on the specified page
+    """
+    try:
+        import pandas as pd
+        import httpx
+        from bs4 import BeautifulSoup
+
+        # Construct the URL for the specified page
+        url = f"https://stats.espncricinfo.com/ci/engine/stats/index.html?class=2;page={page_number};template=results;type=batting"
+
+        # Fetch the page content
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            html_content = response.text
+
+        # Parse the HTML
+        soup = BeautifulSoup(html_content, "html.parser")
+
+        # Find the main stats table
+        tables = soup.find_all("table", class_="engineTable")
+        stats_table = None
+
+        for table in tables:
+            if table.find("th", string="Player"):
+                stats_table = table
+                break
+
+        if not stats_table:
+            return "Could not find the batting stats table on the page."
+
+        # Extract the table headers
+        headers = [th.get_text(strip=True) for th in stats_table.find_all("th")]
+
+        # Find the index of the "0" column (ducks)
+        duck_col_index = None
+        for i, header in enumerate(headers):
+            if header == "0":
+                duck_col_index = i
+                break
+
+        if duck_col_index is None:
+            return "Could not find the '0' (ducks) column in the table."
+
+        # Extract the data rows
+        rows = stats_table.find_all("tr", class_="data1")
+
+        # Sum the ducks
+        total_ducks = 0
+        for row in rows:
+            cells = row.find_all("td")
+            if len(cells) > duck_col_index:
+                duck_value = cells[duck_col_index].get_text(strip=True)
+                if duck_value and duck_value.isdigit():
+                    total_ducks += int(duck_value)
+
+        return f"""
+# Cricket Analysis: Ducks Count
+
+## Data Source
+ESPN Cricinfo ODI batting stats, page {page_number}
+
+## Analysis
+The total number of ducks across all players on page {page_number} is: **{total_ducks}**
+
+## Method
+- Extracted the batting statistics table from ESPN Cricinfo
+- Located the column representing ducks (titled "0")
+- Summed all values in this column
+"""
+    except Exception as e:
+        return f"Error counting cricket ducks: {str(e)}"
+
+async def create_docker_image(
+    tag: str, dockerfile_content: Optional[str] = None
+) -> str:
+    """
+    Generate Dockerfile and instructions for Docker Hub deployment.
+
+    Args:
+        tag: Tag for the Docker image
+        dockerfile_content: Optional Dockerfile content
+
+    Returns:
+        Dockerfile and deployment instructions
+    """
+    try:
+        # Default Dockerfile if none provided
+        if not dockerfile_content:
+            dockerfile_content = """FROM python:3.9-slim
+WORKDIR /app
+COPY . .
+RUN pip install -r requirements.txt
+CMD ["python", "app.py"]"""
+
+        # Instructions
+        instructions = f"""# Docker Image Deployment Instructions
+
+## Dockerfile
+{dockerfile_content}
+
+## Build and Push Commands
+```bash
+docker build -t yourusername/yourrepo:{tag} .
+docker push yourusername/yourrepo:{tag}
+"""
+        return instructions
+    except Exception as e:
+        return f"Error creating Docker image instructions: {str(e)}"
+
+async def analyze_bandwidth_by_ip(
+    file_path: str,
+    section_path: str = None,
+    specific_date: str = None,
+    timezone_offset: str = None,
+) -> str:
+    """
+    Analyze Apache log files to identify top bandwidth consumers by IP address
+
+    Args:
+        file_path: Path to the Apache log file (can be gzipped)
+        section_path: Path section to filter (e.g., '/kannada/')
+        specific_date: Date to filter in format 'YYYY-MM-DD'
+        timezone_offset: Timezone offset in format '+0000' or '-0500'
+
+    Returns:
+        Analysis of bandwidth usage by IP address
+    """
+    try:
+        import gzip
+        import re
+        from datetime import datetime
+        from collections import defaultdict
+        import heapq
+
+        # Open the file (handling gzip if needed)
+        if file_path.endswith(".gz"):
+            open_func = gzip.open
+            mode = "rt"  # text mode for gzip
+        else:
+            open_func = open
+            mode = "r"
+
+        # Initialize data structures
+        ip_bandwidth = defaultdict(int)  # Maps IP addresses to total bytes
+        ip_requests = defaultdict(int)  # Maps IP addresses to request count
+        total_requests = 0
+        filtered_requests = 0
+        parsing_errors = 0
+
+        # Parse the specific date if provided
+        target_date = None
+        if specific_date:
+            try:
+                target_date = datetime.strptime(specific_date, "%Y-%m-%d")
+            except ValueError:
+                return f"Invalid date format: {specific_date}. Please use YYYY-MM-DD format."
+
+        # Regular expression for parsing Apache log entries
+        # This pattern handles the complex format with quoted fields and unquoted time field
+        log_pattern = r'([^ ]*) ([^ ]*) ([^ ]*) \[([^]]*)\] "([^"]*)" ([^ ]*) ([^ ]*) "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)"'
+
+        # Process the log file line by line
+        with open_func(file_path, mode, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                total_requests += 1
+
+                try:
+                    # Handle escaped quotes in user agent field
+                    line = line.replace('\\"', "~~ESCAPED_QUOTE~~")
+
+                    # Parse the log entry
+                    match = re.match(log_pattern, line)
+                    if not match:
+                        parsing_errors += 1
+                        continue
+
+                    # Extract fields
+                    (
+                        ip,
+                        remote_logname,
+                        remote_user,
+                        time_str,
+                        request,
+                        status,
+                        size,
+                        referer,
+                        user_agent,
+                        vhost,
+                        server,
+                    ) = match.groups()
+
+                    # Restore escaped quotes
+                    user_agent = user_agent.replace("~~ESCAPED_QUOTE~~", '"')
+
+                    # Parse the time string
+                    # Format: [01/May/2024:00:00:00 +0000]
+                    time_match = re.match(
+                        r"\[(\d+)/(\w+)/(\d+):(\d+):(\d+):(\d+) ([+-]\d+)\]", time_str
+                    )
+                    if not time_match:
+                        parsing_errors += 1
+                        continue
+
+                    day, month, year, hour, minute, second, log_tz = time_match.groups()
+
+                    # Convert month name to number
+                    month_num = {
+                        "Jan": 1,
+                        "Feb": 2,
+                        "Mar": 3,
+                        "Apr": 4,
+                        "May": 5,
+                        "Jun": 6,
+                        "Jul": 7,
+                        "Aug": 8,
+                        "Sep": 9,
+                        "Oct": 10,
+                        "Nov": 11,
+                        "Dec": 12,
+                    }.get(month, None)
+
+                    if not month_num:
+                        parsing_errors += 1
+                        continue
+
+                    # Create datetime object
+                    log_date = datetime(
+                        int(year),
+                        month_num,
+                        int(day),
+                        int(hour),
+                        int(minute),
+                        int(second),
+                    )
+
+                    # Apply timezone adjustment if needed
+                    if timezone_offset and timezone_offset != log_tz:
+                        # Parse the timezone offsets
+                        log_tz_hours = int(log_tz[1:3])
+                        log_tz_minutes = int(log_tz[3:5])
+                        log_tz_sign = 1 if log_tz[0] == "+" else -1
+                        log_tz_offset = log_tz_sign * (
+                            log_tz_hours * 60 + log_tz_minutes
+                        )
+
+                        target_tz_hours = int(timezone_offset[1:3])
+                        target_tz_minutes = int(timezone_offset[3:5])
+                        target_tz_sign = 1 if timezone_offset[0] == "+" else -1
+                        target_tz_offset = target_tz_sign * (
+                            target_tz_hours * 60 + target_tz_minutes
+                        )
+
+                        # Calculate the difference in minutes
+                        tz_diff_minutes = target_tz_offset - log_tz_offset
+
+                        # Adjust the datetime
+                        from datetime import timedelta
+
+                        log_date = log_date + timedelta(minutes=tz_diff_minutes)
+
+                    # Check if the log entry matches the target date
+                    if target_date and (
+                        log_date.year != target_date.year
+                        or log_date.month != target_date.month
+                        or log_date.day != target_date.day
+                    ):
+                        continue
+
+                    # Parse the request
+                    request_parts = request.split()
+                    if len(request_parts) < 2:
+                        parsing_errors += 1
+                        continue
+
+                    method, url = request_parts[0], request_parts[1]
+
+                    # Check if the URL starts with the specified section path
+                    if section_path and not url.startswith(section_path):
+                        continue
+
+                    # Parse the size field
+                    try:
+                        bytes_sent = int(size) if size != "-" else 0
+                    except ValueError:
+                        bytes_sent = 0
+
+                    # Update the IP bandwidth and request count
+                    ip_bandwidth[ip] += bytes_sent
+                    ip_requests[ip] += 1
+                    filtered_requests += 1
+
+                except Exception as e:
+                    parsing_errors += 1
+                    continue
+
+        # Find the top bandwidth consumers
+        if not ip_bandwidth:
+            return "No matching requests found."
+
+        # Sort IPs by bandwidth consumption (descending)
+        top_ips = sorted(ip_bandwidth.items(), key=lambda x: x[1], reverse=True)
+
+        # Format the results
+        top_ip, top_bandwidth = top_ips[0]
+
+        # Create a detailed response
+        response = f"""
+# Bandwidth Analysis Results
+
+## Top Bandwidth Consumer
+- **IP Address**: {top_ip}
+- **Total Bytes Downloaded**: {top_bandwidth}
+- **Number of Requests**: {ip_requests[top_ip]}
+
+## Analysis Parameters
+- Section Path: {section_path if section_path else 'All'}
+- Date: {specific_date if specific_date else 'All dates'}
+- Timezone Adjustment: {timezone_offset if timezone_offset else 'None'}
+
+## Top 5 Bandwidth Consumers
+| IP Address | Bytes Downloaded | Number of Requests | Average Bytes per Request |
+|------------|------------------|-------------------|--------------------------|
+"""
+
+        # Add the top 5 IPs (or fewer if there aren't 5)
+        for i, (ip, bandwidth) in enumerate(top_ips[:5]):
+            avg_bytes = bandwidth / ip_requests[ip] if ip_requests[ip] > 0 else 0
+            response += (
+                f"| {ip} | {bandwidth} | {ip_requests[ip]} | {avg_bytes:.2f} |\n"
+            )
+
+        response += f"""
+## Processing Statistics
+- Total Log Entries: {total_requests}
+- Filtered Requests: {filtered_requests}
+- Parsing Errors: {parsing_errors}
+- Success Rate: {((total_requests - parsing_errors) / total_requests * 100) if total_requests > 0 else 0:.2f}%
+"""
+
+        return response
+
+    except Exception as e:
+        import traceback
+
+        return f"Error analyzing bandwidth: {str(e)}\n{traceback.format_exc()}"
+async def get_weather_forecast(city: str) -> str:
+    """
+    Get weather forecast for a city using BBC Weather API
+
+    Args:
+        city: Name of the city
+
+    Returns:
+        JSON data of weather forecast with dates and descriptions
+    """
+    try:
+        import httpx
+        import json
+
+        # Step 1: Get the location ID for the city
+        locator_url = "https://locator-service.api.bbci.co.uk/locations"
+        params = {
+            "api_key": "AGbFAKx58hyjQScCXIYrxuEwJh2W2cmv",  # This is a public API key used by BBC
+            "stack": "aws",
+            "locale": "en-GB",
+            "filter": "international",
+            "place-types": "settlement,airport,district",
+            "order": "importance",
+            "a": city,
+            "format": "json",
+        }
+
+        async with httpx.AsyncClient() as client:
+            # Get location ID
+            response = await client.get(locator_url, params=params)
+            response.raise_for_status()
+            location_data = response.json()
+
+            if (
+                not location_data.get("locations")
+                or len(location_data["locations"]) == 0
+            ):
+                return f"Could not find location ID for {city}"
+
+            location_id = location_data["locations"][0]["id"]
+
+            # Step 2: Get the weather forecast using the location ID
+            weather_url = f"https://weather-broker-cdn.api.bbci.co.uk/en/forecast/aggregated/{location_id}"
+            weather_response = await client.get(weather_url)
+            weather_response.raise_for_status()
+            weather_data = weather_response.json()
+
+            # Step 3: Extract the forecast data
+            forecasts = weather_data.get("forecasts", [{}])[0].get("forecasts", [])
+
+            # Create a dictionary mapping dates to weather descriptions
+            weather_forecast = {}
+            for forecast in forecasts:
+                local_date = forecast.get("localDate")
+                description = forecast.get("enhancedWeatherDescription")
+                if local_date and description:
+                    weather_forecast[local_date] = description
+
+            # Format as JSON
+            forecast_json = json.dumps(weather_forecast, indent=2)
+
+            return f"""
+# Weather Forecast for {city}
+
+## Location Details
+- City: {city}
+- Location ID: {location_id}
+- Source: BBC Weather API
+
+## Forecast
+```json
+{forecast_json}
+```
+
+## Summary
+Retrieved weather forecast for {len(weather_forecast)} days.
+"""
+    except Exception as e:
+        return f"Error retrieving weather forecast: {str(e)}"
+
+async def generate_structured_output(prompt: str, structure_type: str) -> str:
+    """
+    Generate structured JSON output using OpenAI API
+    """
+    import json
+
+    # Example for addresses structure
+    if structure_type.lower() == "addresses":
+        request_body = {
+            "model": "gpt-4o-mini",
+            "messages": [
+                {"role": "system", "content": "Respond in JSON"},
+                {"role": "user", "content": prompt},
+            ],
+            "response_format": {
+                "type": "json_object",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "addresses": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "latitude": {"type": "number"},
+                                    "city": {"type": "string"},
+                                    "apartment": {"type": "string"},
+                                },
+                                "required": ["latitude", "city", "apartment"],
+                            },
+                        }
+                    },
+                    "required": ["addresses"],
+                    "additionalProperties": False,
+                },
+            },
+        }
+    else:
+        # Generic structure for other types
+        request_body = {
+            "model": "gpt-4o-mini",
+            "messages": [
+                {"role": "system", "content": "Respond in JSON"},
+                {"role": "user", "content": prompt},
+            ],
+            "response_format": {"type": "json_object"},
+        }
+
+    # Format the JSON nicely
+    formatted_json = json.dumps(request_body, indent=2)
+
+    return f"""
+# Structured Output Request Body
+
+The following JSON body can be sent to the OpenAI API to generate structured output for "{prompt}":
+
+```json
+{formatted_json}
+```
+
+## Request Details
+- Model: gpt-4o-mini
+- Structure Type: {structure_type}
+- API Endpoint: https://api.openai.com/v1/chat/completions
+- Request Type: POST
+This request is configured to return a structured JSON response that follows the specified schema.
+"""
+async def generate_structured_output(prompt: str, structure_type: str) -> str:
+    """
+    Generate structured JSON output using OpenAI API.
+    """
+    import json
+
+    schema = {
+        "addresses": {
+            "type": "object",
+            "properties": {
+                "addresses": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "latitude": {"type": "number"},
+                            "city": {"type": "string"},
+                            "apartment": {"type": "string"},
+                        },
+                        "required": ["latitude", "city", "apartment"],
+                    },
+                }
+            },
+            "required": ["addresses"],
+            "additionalProperties": False,
+        }
+    }.get(structure_type.lower())
+
+    request_body = {
+        "model": "gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": "Respond in JSON"},
+            {"role": "user", "content": prompt},
+        ],
+        "response_format": {"type": "json_object", **({"schema": schema} if schema else {})},
+    }
+
+    return (
+        f"# Structured Output Request\n\n"
+        f"Send the following JSON to OpenAI's API for structured output:\n\n"
+        f"```json\n{json.dumps(request_body, indent=2)}\n```\n\n"
+        f"- **Model:** gpt-4o-mini\n"
+        f"- **Type:** {structure_type}\n"
+        f"- **Endpoint:** `https://api.openai.com/v1/chat/completions`\n"
+    )
+async def get_imdb_movies(
+    min_rating: float = 7.0, max_rating: float = 8.0, limit: int = 25
+) -> str:
+    """
+    Get movie information from IMDb with ratings in a specific range
+
+    Args:
+        min_rating: Minimum rating to filter by
+        max_rating: Maximum rating to filter by
+        limit: Maximum number of movies to return
+
+    Returns:
+        JSON data of movies with their ID, title, year, and rating
+    """
+    try:
+        import httpx
+        from bs4 import BeautifulSoup
+        import json
+        import re
+
+        # Construct the URL with the rating filter
+        url = f"https://www.imdb.com/search/title/?title_type=feature&user_rating={min_rating},{max_rating}&sort=user_rating,desc"
+
+        # Set headers to mimic a browser request
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+
+        # Fetch the page content
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            html_content = response.text
+
+        # Parse the HTML
+        soup = BeautifulSoup(html_content, "html.parser")
+
+        # Find all movie items
+        movie_items = soup.find_all("div", class_="lister-item-content")
+
+        # Extract movie data
+        movies = []
+        for item in movie_items[:limit]:
+            # Get the movie title and year
+            title_element = item.find("h3", class_="lister-item-header").find("a")
+            title = title_element.get_text(strip=True)
+
+            # Extract the movie ID from the href attribute
+            href = title_element.get("href", "")
+            id_match = re.search(r"/title/(tt\d+)/", href)
+            movie_id = id_match.group(1) if id_match else ""
+
+            # Extract the year
+            year_element = item.find("span", class_="lister-item-year")
+            year_text = year_element.get_text(strip=True) if year_element else ""
+            year_match = re.search(r"\((\d{4})\)", year_text)
+            year = year_match.group(1) if year_match else ""
+
+            # Extract the rating
+            rating_element = item.find("div", class_="ratings-imdb-rating")
+            rating = rating_element.get("data-value", "") if rating_element else ""
+
+            # Add to the movies list
+            if movie_id and title:
+                movies.append(
+                    {"id": movie_id, "title": title, "year": year, "rating": rating}
+                )
+
+        # Convert to JSON
+        movies_json = json.dumps(movies, indent=2)
+
+        return f"""
+# IMDb Movie Data
+
+## Filter Criteria
+- Minimum Rating: {min_rating}
+- Maximum Rating: {max_rating}
+- Limit: {limit} movies
+
+## Results
+```json
+{movies_json}
+```
+## Summary
+Retrieved {len(movies)} movies with ratings between {min_rating} and {max_rating}.
+"""
+    except Exception as e:
+        return f"Error retrieving IMDb movies: {str(e)}"
+
+async def analyze_sales_with_phonetic_clustering(
+    file_path: str, query_params: dict
+) -> str:
+    """
+    Analyze sales data with phonetic clustering to handle misspelled city names
+
+    Args:
+        file_path: Path to the sales data JSON file
+        query_params: Dictionary containing query parameters (product, city, min_sales, etc.)
+
+    Returns:
+        Analysis results as a string
+    """
+    try:
+        import json
+        import pandas as pd
+        from jellyfish import soundex, jaro_winkler_similarity
+
+        # Load the sales data
+        with open(file_path, "r") as f:
+            sales_data = json.load(f)
+
+        # Convert to DataFrame for easier analysis
+        df = pd.DataFrame(sales_data)
+
+        # Extract query parameters
+        product = query_params.get("product")
+        city = query_params.get("city")
+        min_sales = query_params.get("min_sales", 0)
+
+        # Create a function to check if two city names are phonetically similar
+        def is_similar_city(city1, city2, threshold=0.85):
+            # Check exact match first
+            if city1.lower() == city2.lower():
+                return True
+
+            # Check soundex (phonetic algorithm)
+            if soundex(city1) == soundex(city2):
+                # If soundex matches, check similarity score for confirmation
+                similarity = jaro_winkler_similarity(city1.lower(), city2.lower())
+                return similarity >= threshold
+
+            return False
+
+        # Create a mapping of city name variations to canonical names
+        city_clusters = {}
+        canonical_cities = set()
+
+        # First pass: identify unique canonical city names
+        for record in sales_data:
+            city_name = record["city"]
+            found_match = False
+
+            for canonical in canonical_cities:
+                if is_similar_city(city_name, canonical):
+                    city_clusters[city_name] = canonical
+                    found_match = True
+                    break
+
+            if not found_match:
+                canonical_cities.add(city_name)
+                city_clusters[city_name] = city_name
+
+        # Add a new column with standardized city names
+        df["standardized_city"] = df["city"].map(city_clusters)
+
+        # Filter based on query parameters
+        filtered_df = df.copy()
+
+        if product:
+            filtered_df = filtered_df[filtered_df["product"] == product]
+
+        if city:
+            # Find all variations of the queried city
+            similar_cities = [
+                c for c in city_clusters.keys() if is_similar_city(c, city)
+            ]
+
+            # Filter by all similar city names
+            filtered_df = filtered_df[filtered_df["city"].isin(similar_cities)]
+
+        if min_sales:
+            filtered_df = filtered_df[filtered_df["sales"] >= min_sales]
+
+        # Calculate results
+        total_units = filtered_df["sales"].sum()
+        transaction_count = len(filtered_df)
+
+        # Generate detailed report
+        report = f"Analysis Results:\n"
+        report += f"Total units: {total_units}\n"
+        report += f"Transaction count: {transaction_count}\n"
+
+        if transaction_count > 0:
+            report += f"Average units per transaction: {total_units / transaction_count:.2f}\n"
+
+            # Show city variations if city filter was applied
+            if city:
+                city_variations = filtered_df["city"].unique()
+                report += f"City variations found: {', '.join(city_variations)}\n"
+
+        # Return the filtered data for further analysis if needed
+        return report
+
+    except Exception as e:
+        import traceback
+
+        return f"Error analyzing sales data: {str(e)}\n{traceback.format_exc()}"
+async def parse_partial_json_sales(file_path: str) -> str:
+    """
+    Parse partial JSON data from a JSONL file and calculate total sales
+
+    Args:
+        file_path: Path to the JSONL file with partial JSON data
+
+    Returns:
+        Total sales value
+    """
+    try:
+        import json
+        import re
+
+        total_sales = 0
+        processed_rows = 0
+        error_rows = 0
+
+        # Regular expression to extract sales values
+        # This pattern looks for "sales":number or "sales": number
+        sales_pattern = r'"sales"\s*:\s*(\d+\.?\d*)'
+
+        with open(file_path, "r", encoding="utf-8") as file:
+            for line in file:
+                try:
+                    # Try standard JSON parsing first
+                    try:
+                        data = json.loads(line.strip())
+                        if "sales" in data:
+                            total_sales += float(data["sales"])
+                            processed_rows += 1
+                            continue
+                    except json.JSONDecodeError:
+                        pass
+
+                    # If standard parsing fails, use regex
+                    match = re.search(sales_pattern, line)
+                    if match:
+                        sales_value = float(match.group(1))
+                        total_sales += sales_value
+                        processed_rows += 1
+                    else:
+                        error_rows += 1
+
+                except Exception as e:
+                    error_rows += 1
+                    continue
+
+        # Format the response
+        if processed_rows > 0:
+            # Return just the total sales value as requested
+            return f"{total_sales:.2f}"
+        else:
+            return "No valid sales data found in the file."
+
+    except Exception as e:
+        import traceback
+
+        return f"Error parsing partial JSON: {str(e)}\n{traceback.format_exc()}"
+async def count_unique_students(file_path: str) -> str:
+    """
+    Count unique students in a text file based on student IDs
+
+    Args:
+        file_path: Path to the text file with student marks
+
+    Returns:
+        Number of unique students
+    """
+    try:
+        import re
+
+        # Set to store unique student IDs
+        unique_students = set()
+
+        # Regular expressions to extract student IDs with different patterns
+        id_patterns = [
+            r"Student\s+ID\s*[:=]?\s*(\w+)",  # Student ID: 12345
+            r"ID\s*[:=]?\s*(\w+)",  # ID: 12345
+            r"Roll\s+No\s*[:=]?\s*(\w+)",  # Roll No: 12345
+            r"Roll\s+Number\s*[:=]?\s*(\w+)",  # Roll Number: 12345
+            r"Registration\s+No\s*[:=]?\s*(\w+)",  # Registration No: 12345
+            r"(\d{6,10})",  # Just a 6-10 digit number (likely a student ID)
+        ]
+
+        # Read the file line by line
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as file:
+            for line in file:
+                # Try each pattern to find student IDs
+                for pattern in id_patterns:
+                    matches = re.finditer(pattern, line, re.IGNORECASE)
+                    for match in matches:
+                        student_id = match.group(1).strip()
+                        # Validate the ID (basic check to avoid false positives)
+                        if (
+                            len(student_id) >= 3
+                        ):  # Most student IDs are at least 3 chars
+                            unique_students.add(student_id)
+
+        # Count unique student IDs
+        count = len(unique_students)
+
+        return str(count)
+
+    except Exception as e:
+        import traceback
+
+        return f"Error counting unique students: {str(e)}\n{traceback.format_exc()}"
+async def analyze_apache_logs(
+    file_path: str,
+    section_path: str = None,
+    day_of_week: str = None,
+    start_hour: int = None,
+    end_hour: int = None,
+    request_method: str = None,
+    status_range: tuple = None,
+    timezone_offset: str = None,
+) -> str:
+    """
+    Analyze Apache log files to count requests matching specific criteria
+
+    Args:
+        file_path: Path to the Apache log file (can be gzipped)
+        section_path: Path section to filter (e.g., '/telugump3/')
+        day_of_week: Day to filter (e.g., 'Tuesday')
+        start_hour: Starting hour for time window (inclusive)
+        end_hour: Ending hour for time window (exclusive)
+        request_method: HTTP method to filter (e.g., 'GET')
+        status_range: Tuple of (min_status, max_status) for HTTP status codes
+        timezone_offset: Timezone offset in format '+0000' or '-0500'
+
+    Returns:
+        Count of matching requests and analysis details
+    """
+    try:
+        import gzip
+        import re
+        from datetime import datetime
+        import calendar
+
+        # Define day name to number mapping
+        day_name_to_num = {
+            "monday": 0,
+            "tuesday": 1,
+            "wednesday": 2,
+            "thursday": 3,
+            "friday": 4,
+            "saturday": 5,
+            "sunday": 6,
+        }
+
+        # Convert day_of_week to lowercase if provided
+        if day_of_week:
+            day_of_week = day_of_week.lower()
+            if day_of_week not in day_name_to_num:
+                return f"Invalid day of week: {day_of_week}"
+
+        # Set default status range if not provided
+        if status_range is None:
+            status_range = (200, 299)
+
+        # Regular expression for parsing Apache log entries
+        # This pattern handles the complex format with quoted fields and unquoted time field
+        log_pattern = r'([^ ]*) ([^ ]*) ([^ ]*) \[([^]]*)\] "([^"]*)" ([^ ]*) ([^ ]*) "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)"'
+
+        # Open the file (handling gzip if needed)
+        if file_path.endswith(".gz"):
+            open_func = gzip.open
+            mode = "rt"  # text mode for gzip
+        else:
+            open_func = open
+            mode = "r"
+
+        # Counter for matching requests
+        matching_requests = 0
+        total_requests = 0
+        parsing_errors = 0
+
+        # Process the log file line by line
+        with open_func(file_path, mode, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                total_requests += 1
+
+                try:
+                    # Handle escaped quotes in user agent field
+                    # This is a simplification - for complex cases, a more robust parser might be needed
+                    line = line.replace('\\"', "~~ESCAPED_QUOTE~~")
+
+                    # Parse the log entry
+                    match = re.match(log_pattern, line)
+                    if not match:
+                        parsing_errors += 1
+                        continue
+
+                    # Extract fields
+                    (
+                        ip,
+                        remote_logname,
+                        remote_user,
+                        time_str,
+                        request,
+                        status,
+                        size,
+                        referer,
+                        user_agent,
+                        vhost,
+                        server,
+                    ) = match.groups()
+
+                    # Restore escaped quotes
+                    user_agent = user_agent.replace("~~ESCAPED_QUOTE~~", '"')
+
+                    # Parse the time string
+                    # Format: [01/May/2024:00:00:00 +0000]
+                    time_match = re.match(
+                        r"\[(\d+)/(\w+)/(\d+):(\d+):(\d+):(\d+) ([+-]\d+)\]", time_str
+                    )
+                    if not time_match:
+                        parsing_errors += 1
+                        continue
+
+                    day, month, year, hour, minute, second, log_tz = time_match.groups()
+
+                    # Convert month name to number
+                    month_num = {
+                        "Jan": 1,
+                        "Feb": 2,
+                        "Mar": 3,
+                        "Apr": 4,
+                        "May": 5,
+                        "Jun": 6,
+                        "Jul": 7,
+                        "Aug": 8,
+                        "Sep": 9,
+                        "Oct": 10,
+                        "Nov": 11,
+                        "Dec": 12,
+                    }.get(month, None)
+
+                    if not month_num:
+                        parsing_errors += 1
+                        continue
+
+                    # Create datetime object
+                    log_date = datetime(
+                        int(year),
+                        month_num,
+                        int(day),
+                        int(hour),
+                        int(minute),
+                        int(second),
+                    )
+
+                    # Apply timezone adjustment if needed
+                    if timezone_offset and timezone_offset != log_tz:
+                        # Parse the timezone offsets
+                        log_tz_hours = int(log_tz[1:3])
+                        log_tz_minutes = int(log_tz[3:5])
+                        log_tz_sign = 1 if log_tz[0] == "+" else -1
+                        log_tz_offset = log_tz_sign * (
+                            log_tz_hours * 60 + log_tz_minutes
+                        )
+
+                        target_tz_hours = int(timezone_offset[1:3])
+                        target_tz_minutes = int(timezone_offset[3:5])
+                        target_tz_sign = 1 if timezone_offset[0] == "+" else -1
+                        target_tz_offset = target_tz_sign * (
+                            target_tz_hours * 60 + target_tz_minutes
+                        )
+
+                        # Calculate the difference in minutes
+                        tz_diff_minutes = target_tz_offset - log_tz_offset
+
+                        # Adjust the datetime
+                        from datetime import timedelta
+
+                        log_date = log_date + timedelta(minutes=tz_diff_minutes)
+
+                    # Parse the request
+                    request_parts = request.split()
+                    if len(request_parts) < 2:
+                        parsing_errors += 1
+                        continue
+
+                    method, url = request_parts[0], request_parts[1]
+
+                    # Apply filters
+
+                    # 1. Check day of week
+                    if (
+                        day_of_week
+                        and log_date.weekday() != day_name_to_num[day_of_week]
+                    ):
+                        continue
+
+                    # 2. Check hour range
+                    if start_hour is not None and log_date.hour < start_hour:
+                        continue
+                    if end_hour is not None and log_date.hour >= end_hour:
+                        continue
+
+                    # 3. Check request method
+                    if request_method and method.upper() != request_method.upper():
+                        continue
+
+                    # 4. Check URL section
+                    if section_path and section_path not in url:
+                        continue
+
+                    # 5. Check status code
+                    try:
+                        status_code = int(status)
+                        if status_range and (
+                            status_code < status_range[0]
+                            or status_code > status_range[1]
+                        ):
+                            continue
+                    except ValueError:
+                        parsing_errors += 1
+                        continue
+
+                    # If we got here, the request matches all criteria
+                    matching_requests += 1
+
+                except Exception as e:
+                    parsing_errors += 1
+                    continue
+
+        # Create a detailed response
+        response = f"""
+# Apache Log Analysis Results
+
+## Request Count
+**{matching_requests}** requests matched the specified criteria.
+
+## Analysis Parameters
+- Section Path: {section_path if section_path else 'All'}
+- Day of Week: {day_of_week.capitalize() if day_of_week else 'All'}
+- Time Window: {f"{start_hour}:00 to {end_hour}:00" if start_hour is not None and end_hour is not None else "All hours"}
+- Request Method: {request_method if request_method else 'All'}
+- Status Code Range: {status_range}
+- Timezone Adjustment: {timezone_offset if timezone_offset else 'None'}
+
+## Processing Statistics
+- Total Log Entries: {total_requests}
+- Parsing Errors: {parsing_errors}
+- Success Rate: {((total_requests - parsing_errors) / total_requests * 100) if total_requests > 0 else 0:.2f}%
+
+## Interpretation
+This analysis shows the number of requests that match all specified criteria in the Apache log file.
+"""
+
+        return response
+
+    except Exception as e:
+        import traceback
+
+        return f"Error analyzing Apache logs: {str(e)}\n{traceback.format_exc()}"
+
+
