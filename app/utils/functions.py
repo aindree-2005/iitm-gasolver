@@ -1046,4 +1046,308 @@ This data can be used for:
 """
     except Exception as e:
         return f"Error finding DuckDB Hacker News post: {str(e)}"
+import numpy as np
+from PIL import Image
+async def analyze_image_brightness(file_path: str, threshold: float = 0.937) -> str:
+    """
+    Analyze the brightness of an image and count pixels above the threshold.
+
+    Args:
+        file_path (str): The path to the image file.
+        threshold (float, optional): Brightness threshold. Defaults to 0.937.
+
+    Returns:
+        str: Brightness analysis result with pixel count above the threshold.
+    """
+    try:
+        # Open image and convert to grayscale
+        image = Image.open(file_path).convert("L")
+        
+        # Convert to NumPy array and normalize pixel values
+        pixels = np.array(image) / 255.0
+        
+        # Compute average brightness
+        avg_brightness = np.mean(pixels)
+        
+        # Count pixels above threshold
+        bright_pixels_count = np.sum(pixels > threshold)
+        total_pixels = pixels.size
+        
+        # Compare with threshold
+        if avg_brightness > threshold:
+            return (f"Image at {file_path} is bright (Average Brightness: {avg_brightness:.3f}), "
+                    f"Pixels above threshold: {bright_pixels_count}/{total_pixels}")
+        else:
+            return (f"Image at {file_path} is dark (Average Brightness: {avg_brightness:.3f}), "
+                    f"Pixels above threshold: {bright_pixels_count}/{total_pixels}")
+    except Exception as e:
+        return f"Error analyzing image brightness: {str(e)}"
+
+import httpx
+import json
+import asyncio
+
+async def get_bounding_box(city: str) -> str:
+    """
+    Get the minimum latitude of a given city using the Nominatim API
+
+    Args:
+        city (str): The name of the city to search for.
+
+    Returns:
+        Information about the city's bounding box
+    """
+    try:
+        # Nominatim API endpoint
+        url = "https://nominatim.openstreetmap.org/search"
+
+        # Parameters for the request
+        params = {
+            "city": city,
+            "country": "India",
+            "format": "json",
+            "limit": 10,  # Get multiple results to ensure we find the right one
+        }
+
+        # Headers to identify our application (required by Nominatim usage policy)
+        headers = {"User-Agent": "LocationDataRetriever/1.0"}
+
+        async with httpx.AsyncClient() as client:
+            # Add a small delay to respect rate limits
+            await asyncio.sleep(1)
+
+            # Make the request
+            response = await client.get(url, params=params, headers=headers)
+            response.raise_for_status()
+            results = response.json()
+
+            if not results:
+                return f"No results found for {city}, India"
+
+            # Find the correct city
+            selected_city = results[0]
+
+            if selected_city and "boundingbox" in selected_city:
+                # Extract the minimum latitude from the bounding box
+                min_lat = selected_city["boundingbox"][0]
+                return min_lat
+            else:
+                return f"Bounding box information not available for {city}"
+    
+    except Exception as e:
+        return f"Error retrieving bounding box for {city}: {str(e)}"
+
+async def convert_pdf_to_markdown(file_path: str) -> str:
+    """
+    Convert a PDF file to Markdown and format it with Prettier
+
+    Args:
+        file_path: Path to the PDF file
+
+    Returns:
+        Formatted Markdown content
+    """
+    try:
+        import PyPDF2
+        import re
+        import subprocess
+        import os
+        import tempfile
+
+        # Create a temporary directory
+        temp_dir = tempfile.mkdtemp()
+        raw_md_path = os.path.join(temp_dir, "raw_content.md")
+        formatted_md_path = os.path.join(temp_dir, "formatted_content.md")
+
+        try:
+            # Extract text from PDF
+            with open(file_path, "rb") as file:
+                pdf_reader = PyPDF2.PdfReader(file)
+                text = ""
+
+                for page_num in range(len(pdf_reader.pages)):
+                    page = pdf_reader.pages[page_num]
+                    text += page.extract_text()
+
+            # Basic conversion to Markdown
+            # Replace multiple newlines with double newlines for paragraphs
+            markdown_text = re.sub(r"\n{3,}", "\n\n", text)
+
+            # Handle headings (assuming headings are in larger font or bold)
+            # This is a simplified approach - real implementation would need more sophisticated detection
+            lines = markdown_text.split("\n")
+            processed_lines = []
+
+            for line in lines:
+                # Strip line
+                stripped_line = line.strip()
+
+                # Skip empty lines
+                if not stripped_line:
+                    processed_lines.append("")
+                    continue
+
+                # Detect potential headings (simplified approach)
+                if len(stripped_line) < 100 and stripped_line.endswith(":"):
+                    # Assume this is a heading
+                    processed_lines.append(f"## {stripped_line[:-1]}")
+                elif len(stripped_line) < 50 and stripped_line.isupper():
+                    # Assume this is a main heading
+                    processed_lines.append(f"# {stripped_line}")
+                else:
+                    # Regular paragraph
+                    processed_lines.append(stripped_line)
+
+            # Join processed lines
+            markdown_text = "\n\n".join(processed_lines)
+
+            # Handle bullet points
+            markdown_text = re.sub(r"•\s*", "* ", markdown_text)
+
+            # Handle numbered lists
+            markdown_text = re.sub(r"(\d+)\.\s+", r"\1. ", markdown_text)
+
+            # Write raw markdown to file
+            with open(raw_md_path, "w", encoding="utf-8") as md_file:
+                md_file.write(markdown_text)
+
+            # Format with Prettier
+            try:
+                # Install Prettier if not already installed
+                subprocess.run(
+                    ["npm", "install", "--no-save", "prettier@3.4.2"],
+                    cwd=temp_dir,
+                    check=True,
+                    capture_output=True,
+                )
+
+                # Run Prettier on the markdown file
+                subprocess.run(
+                    ["npx", "prettier@3.4.2", "--write", raw_md_path],
+                    cwd=temp_dir,
+                    check=True,
+                    capture_output=True,
+                )
+
+                # Read the formatted markdown
+                with open(raw_md_path, "r", encoding="utf-8") as formatted_file:
+                    formatted_markdown = formatted_file.read()
+
+                return f"""
+# PDF to Markdown Conversion
+
+## Formatted Markdown Content
+
+```markdown
+{formatted_markdown}
+```
+
+## Conversion Process
+1. Extracted text from PDF using PyPDF2
+2. Converted text to basic Markdown format
+3. Applied formatting rules for headings, lists, and paragraphs
+4. Formatted the Markdown with Prettier v3.4.2
+
+## Usage Notes
+This formatted Markdown can be used in:
+
+- Documentation systems
+- Content management systems
+- Educational resources
+- Knowledge bases
+"""
+            except subprocess.CalledProcessError as e:
+                # If Prettier fails, return the unformatted markdown
+                return f"""
+# PDF to Markdown Conversion (Prettier formatting failed)
+
+## Markdown Content (Unformatted)
+{markdown_text}
+
+## Error Details
+Failed to format with Prettier: {str(e)}
+"""
+        finally:
+            # Clean up the temporary directory
+            import shutil
+
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+    except Exception as e:
+        return f"Error converting PDF to Markdown: {str(e)}"
+
+async def create_github_action_workflow(email: str, repository_url: str = None) -> str:
+    """
+    Create a GitHub Action workflow that runs daily and adds a commit
+
+    Args:
+        email: Email to include in the step name
+        repository_url: Optional repository URL
+
+    Returns:
+        GitHub Action workflow YAML
+    """
+    try:
+        # Generate GitHub Action workflow
+        workflow = f"""name: Daily Commit
+
+# Schedule to run once per day at 14:30 UTC
+on:
+  schedule:
+    - cron: '30 14 * * *'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  daily-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        
+      - name: {email}
+        run: |
+          # Create a new file with timestamp
+          echo "Daily update on $(date)" > daily-update.txt
+          
+          # Configure Git
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions"
+          
+          # Commit and push changes
+          git add daily-update.txt
+          git commit -m "Daily automated update"
+          git push
+"""
+
+        # Instructions for setting up the workflow
+        instructions = f"""
+# GitHub Action Workflow Setup
+
+## Workflow File
+Save this file as `.github/workflows/daily-commit.yml` in your repository:
+
+```yaml
+{workflow}
+```
+
+## How It Works
+1. This workflow runs automatically at 14:30 UTC every day
+2. It creates a file with the current timestamp
+3. It commits and pushes the changes to your repository
+4. The step name includes your email: {email}
+
+## Manual Trigger
+You can also trigger this workflow manually from the Actions tab in your repository.
+
+## Verification Steps
+1. After setting up, go to the Actions tab in your repository
+2. You should see the "Daily Commit" workflow
+3. Check that it creates a commit during or within 5 minutes of the workflow run
+
+## Repository URL
+{repository_url or "Please provide your repository URL"}
+"""
+        return instructions
+    except Exception as e:
+        return f"Error creating GitHub Action workflow: {str(e)}"
 

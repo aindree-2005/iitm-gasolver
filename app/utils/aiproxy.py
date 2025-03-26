@@ -775,15 +775,21 @@ async def get_openai_response(question: str, file_path: Optional[str] = None) ->
         {
             "type": "function",
             "function": {
-                "name": "get_delhi_bounding_box",
-                "description": "Get the minimum latitude of Delhi, India using the Nominatim API",
+                "name": "get_bounding_box",
+                "description": "Get the minimum latitude of a city in India using the Nominatim API",
                 "parameters": {
                     "type": "object",
-                    "properties": {},
-                    "required": [],
+                    "properties": {
+                        "city": {
+                            "type": "string",
+                            "description": "The name of the city to search for."
+                        }
+                    },
+                    "required": ["city"],
                 },
             },
         },
+
         {
             "type": "function",
             "function": {
@@ -1365,8 +1371,8 @@ async def get_openai_response(question: str, file_path: Optional[str] = None) ->
                     answer = await parse_function_call(
                         query=function_args.get("query", ""),
                     )
-                elif function_name == "get_delhi_bounding_box":
-                    answer = await get_delhi_bounding_box()
+                elif function_name == "get_bounding_box":
+                    answer = await get_bounding_box()
 
                 elif function_name == "find_duckdb_hn_post":
                     answer = await find_duckdb_hn_post()
