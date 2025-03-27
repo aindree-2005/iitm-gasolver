@@ -805,15 +805,30 @@ async def get_openai_response(question: str, file_path: Optional[str] = None) ->
         {
             "type": "function",
             "function": {
-                "name": "find_newest_seattle_github_user",
-                "description": "Find the newest GitHub user in Seattle with over 130 followers",
+                "name": "find_newest_github_user",
+                "description": "Find the newest GitHub user in a specified city with a minimum number of followers",
                 "parameters": {
                     "type": "object",
-                    "properties": {},
-                    "required": [],
-                },
-            },
+                    "properties": {
+                        "city": {
+                            "type": "string",
+                            "description": "The city to search for GitHub users"
+                        },
+                        "min_followers": {
+                            "type": "integer",
+                            "description": "The minimum number of followers required"
+                        },
+                        "cutoff_date": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "The cutoff date for user creation in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ)"
+                        }
+                    },
+                    "required": ["city", "min_followers", "cutoff_date"]
+                }
+            }
         },
+
         {
             "type": "function",
             "function": {
@@ -1377,8 +1392,12 @@ async def get_openai_response(question: str, file_path: Optional[str] = None) ->
                 elif function_name == "find_duckdb_hn_post":
                     answer = await find_duckdb_hn_post()
 
-                elif function_name == "find_newest_seattle_github_user":
-                    answer = await find_newest_seattle_github_user()
+                elif function_name == "find_newest_github_user":
+                    answer = await find_newest_github_user(
+                        city=function_args.get("city"),
+                        min_followers=function_args.get("min_followers"),
+                        cutoff_date=function_args.get("cutoff_date"),
+                    )
 
                 elif function_name == "create_github_action_workflow":
                     answer = await create_github_action_workflow(
