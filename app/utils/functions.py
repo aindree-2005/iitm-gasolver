@@ -10,7 +10,6 @@ import re
 import tempfile
 import shutil
 import subprocess
-import httpx
 import json
 import csv
 from typing import Optional, Dict, Any, List
@@ -1138,7 +1137,6 @@ async def find_duckdb_hn_post() -> str:
         Information about the post and its link
     """
     try:
-        import httpx
         import xml.etree.ElementTree as ET
 
         # HNRSS API endpoint for searching posts with minimum points
@@ -1577,84 +1575,84 @@ async def compute_document_similarity(docs: List[str], query: str) -> str:
 
         # Create FastAPI implementation code
         fastapi_code = """
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List
-import httpx
-import numpy as np
+        from fastapi import FastAPI, HTTPException
+        from fastapi.middleware.cors import CORSMiddleware
+        from pydantic import BaseModel
+        from typing import List
+        import httpx
+        import numpy as np
 
-app = FastAPI()
+        app = FastAPI()
 
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
-    allow_credentials=True,
-    allow_methods=["OPTIONS", "POST"],  # Allow OPTIONS and POST methods
-    allow_headers=["*"],  # Allow all headers
-)
+        # Configure CORS
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],  # Allow all origins
+            allow_credentials=True,
+            allow_methods=["OPTIONS", "POST"],  # Allow OPTIONS and POST methods
+            allow_headers=["*"],  # Allow all headers
+        )
 
-class SimilarityRequest(BaseModel):
-    docs: List[str]
-    query: str
+        class SimilarityRequest(BaseModel):
+            docs: List[str]
+            query: str
 
-@app.post("/similarity")
-async def compute_similarity(request: SimilarityRequest):
-    # Function to calculate cosine similarity
-    def cosine_similarity(vec1, vec2):
-        dot_product = np.dot(vec1, vec2)
-        norm_vec1 = np.linalg.norm(vec1)
-        norm_vec2 = np.linalg.norm(vec2)
-        return dot_product / (norm_vec1 * norm_vec2)
-    
-    # Function to get embeddings from OpenAI API
-    async def get_embedding(text: str):
-        url = "https://api.openai.com/v1/embeddings"
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {AIPROXY_TOKEN}"  # Use environment variable
-        }
-        payload = {
-            "model": "text-embedding-3-small",
-            "input": text
-        }
-        
-        async with httpx.AsyncClient() as client:
-            response = await client.post(url, json=payload, headers=headers)
-            response.raise_for_status()
-            result = response.json()
-            return result["data"][0]["embedding"]
-    
-    try:
-        # Get embeddings for query and documents
-        query_embedding = await get_embedding(request.query)
-        doc_embeddings = []
-        
-        for doc in request.docs:
-            doc_embedding = await get_embedding(doc)
-            doc_embeddings.append(doc_embedding)
-        
-        # Calculate similarities
-        similarities = []
-        for i, doc_embedding in enumerate(doc_embeddings):
-            similarity = cosine_similarity(query_embedding, doc_embedding)
-            similarities.append((i, similarity))
-        
-        # Sort by similarity (descending)
-        similarities.sort(key=lambda x: x[1], reverse=True)
-        
-        # Get top 3 matches (or fewer if less than 3 documents)
-        top_matches = similarities[:min(3, len(similarities))]
-        
-        # Get the matching documents
-        matches = [request.docs[idx] for idx, _ in top_matches]
-        
-        return {"matches": matches}
-    
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-"""
+        @app.post("/similarity")
+        async def compute_similarity(request: SimilarityRequest):
+            # Function to calculate cosine similarity
+            def cosine_similarity(vec1, vec2):
+                dot_product = np.dot(vec1, vec2)
+                norm_vec1 = np.linalg.norm(vec1)
+                norm_vec2 = np.linalg.norm(vec2)
+                return dot_product / (norm_vec1 * norm_vec2)
+            
+            # Function to get embeddings from OpenAI API
+            async def get_embedding(text: str):
+                url = "https://api.openai.com/v1/embeddings"
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {AIPROXY_TOKEN}"  # Use environment variable
+                }
+                payload = {
+                    "model": "text-embedding-3-small",
+                    "input": text
+                }
+                
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(url, json=payload, headers=headers)
+                    response.raise_for_status()
+                    result = response.json()
+                    return result["data"][0]["embedding"]
+            
+            try:
+                # Get embeddings for query and documents
+                query_embedding = await get_embedding(request.query)
+                doc_embeddings = []
+                
+                for doc in request.docs:
+                    doc_embedding = await get_embedding(doc)
+                    doc_embeddings.append(doc_embedding)
+                
+                # Calculate similarities
+                similarities = []
+                for i, doc_embedding in enumerate(doc_embeddings):
+                    similarity = cosine_similarity(query_embedding, doc_embedding)
+                    similarities.append((i, similarity))
+                
+                # Sort by similarity (descending)
+                similarities.sort(key=lambda x: x[1], reverse=True)
+                
+                # Get top 3 matches (or fewer if less than 3 documents)
+                top_matches = similarities[:min(3, len(similarities))]
+                
+                # Get the matching documents
+                matches = [request.docs[idx] for idx, _ in top_matches]
+                
+                return {"matches": matches}
+            
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+        """
 
         # Create response
         response = {"matches": matches}
@@ -3128,73 +3126,73 @@ async def parse_function_call(query: str) -> str:
 
         # Create FastAPI implementation code
         fastapi_code = """
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-import re
-import json
+        from fastapi import FastAPI, HTTPException
+        from fastapi.middleware.cors import CORSMiddleware
+        import re
+        import json
 
-app = FastAPI()
+        app = FastAPI()
 
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
-    allow_credentials=True,
-    allow_methods=["GET"],  # Allow GET method
-    allow_headers=["*"],  # Allow all headers
-)
+        # Configure CORS
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],  # Allow all origins
+            allow_credentials=True,
+            allow_methods=["GET"],  # Allow GET method
+            allow_headers=["*"],  # Allow all headers
+        )
 
-@app.get("/execute")
-async def execute_query(q: str):
-    # Define regex patterns for each function
-    ticket_pattern = r"status of ticket (\d+)"
-    meeting_pattern = r"Schedule a meeting on (\d{4}-\d{2}-\d{2}) at (\d{2}:\d{2}) in (Room \w+)"
-    expense_pattern = r"expense balance for employee (\d+)"
-    bonus_pattern = r"Calculate performance bonus for employee (\d+) for (\d{4})"
-    issue_pattern = r"Report office issue (\d+) for the (\w+) department"
-    
-    # Check each pattern and extract parameters
-    if re.search(ticket_pattern, q):
-        ticket_id = int(re.search(ticket_pattern, q).group(1))
-        function_name = "get_ticket_status"
-        arguments = {"ticket_id": ticket_id}
+        @app.get("/execute")
+        async def execute_query(q: str):
+            # Define regex patterns for each function
+            ticket_pattern = r"status of ticket (\d+)"
+            meeting_pattern = r"Schedule a meeting on (\d{4}-\d{2}-\d{2}) at (\d{2}:\d{2}) in (Room \w+)"
+            expense_pattern = r"expense balance for employee (\d+)"
+            bonus_pattern = r"Calculate performance bonus for employee (\d+) for (\d{4})"
+            issue_pattern = r"Report office issue (\d+) for the (\w+) department"
+            
+            # Check each pattern and extract parameters
+            if re.search(ticket_pattern, q):
+                ticket_id = int(re.search(ticket_pattern, q).group(1))
+                function_name = "get_ticket_status"
+                arguments = {"ticket_id": ticket_id}
 
-    elif re.search(meeting_pattern, q):
-        match = re.search(meeting_pattern, q)
-        date = match.group(1)
-        time = match.group(2)
-        meeting_room = match.group(3)
-        function_name = "schedule_meeting"
-        arguments = {"date": date, "time": time, "meeting_room": meeting_room}
+            elif re.search(meeting_pattern, q):
+                match = re.search(meeting_pattern, q)
+                date = match.group(1)
+                time = match.group(2)
+                meeting_room = match.group(3)
+                function_name = "schedule_meeting"
+                arguments = {"date": date, "time": time, "meeting_room": meeting_room}
 
-    elif re.search(expense_pattern, q):
-        employee_id = int(re.search(expense_pattern, q).group(1))
-        function_name = "get_expense_balance"
-        arguments = {"employee_id": employee_id}
+            elif re.search(expense_pattern, q):
+                employee_id = int(re.search(expense_pattern, q).group(1))
+                function_name = "get_expense_balance"
+                arguments = {"employee_id": employee_id}
 
-    elif re.search(bonus_pattern, q):
-        match = re.search(bonus_pattern, q)
-        employee_id = int(match.group(1))
-        current_year = int(match.group(2))
-        function_name = "calculate_performance_bonus"
-        arguments = {"employee_id": employee_id, "current_year": current_year}
+            elif re.search(bonus_pattern, q):
+                match = re.search(bonus_pattern, q)
+                employee_id = int(match.group(1))
+                current_year = int(match.group(2))
+                function_name = "calculate_performance_bonus"
+                arguments = {"employee_id": employee_id, "current_year": current_year}
 
-    elif re.search(issue_pattern, q):
-        match = re.search(issue_pattern, q)
-        issue_code = int(match.group(1))
-        department = match.group(2)
-        function_name = "report_office_issue"
-        arguments = {"issue_code": issue_code, "department": department}
+            elif re.search(issue_pattern, q):
+                match = re.search(issue_pattern, q)
+                issue_code = int(match.group(1))
+                department = match.group(2)
+                function_name = "report_office_issue"
+                arguments = {"issue_code": issue_code, "department": department}
 
-    else:
-        raise HTTPException(status_code=400, detail="Could not match query to any known function pattern")
+            else:
+                raise HTTPException(status_code=400, detail="Could not match query to any known function pattern")
 
-    # Return the function name and arguments
-    return {
-        "name": function_name,
-        "arguments": json.dumps(arguments)
-    }
-"""
+            # Return the function name and arguments
+            return {
+                "name": function_name,
+                "arguments": json.dumps(arguments)
+            }
+        """
 
         return f"""
 # Function Call Parser
