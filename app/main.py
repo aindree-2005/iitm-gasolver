@@ -20,12 +20,14 @@ app = FastAPI(title="IITM Assignment API")
 @app.get("/")
 def read_root():
     return {"message": "FastAPI deployed on Vercel"}
-
-@app.post("/api/")
+@app.api_route("/api/", methods=["GET", "POST"])
 async def process_question(
-    question: str = Form(...),
+    question: Optional[str] = Form(None),  # Allow optional for GET
     file: Optional[UploadFile] = File(None)
 ):
+    if not question:
+        raise HTTPException(status_code=400, detail="Question is required")
+    
     try:
         temp_file_path = None
         if file:
