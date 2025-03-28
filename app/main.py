@@ -1,5 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 import os
 from typing import Optional
 from app.utils.aiproxy import get_openai_response
@@ -20,6 +21,8 @@ app = FastAPI(title="IITM Assignment API")
 @app.get("/")
 def read_root():
     return {"message": "FastAPI deployed on Vercel"}
+
+# ✅ Support both GET and POST for /api/
 @app.api_route("/api/", methods=["GET", "POST"])
 async def process_question(
     question: Optional[str] = Form(None),  # Allow optional for GET
@@ -37,6 +40,34 @@ async def process_question(
         return {"answer": answer}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# ✅ Serve a simple HTML+JS frontend at /web
+@app.get("/web", response_class=HTMLResponse)
+async def serve_web():
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>IITM Assignment Solver</title>
+    </head>
+    <body>
+        <h2>Ask a Question</h2>
+        <input type="text" id="question" placeholder="Enter your question">
+        <button onclick="askAPI()">Submit</button>
+        <p id="result"></p>
+
+        <script>
+            async function askAPI() {
+                let question = document.getElementById("question").value;
+                let response = await fetch(`/api/?question=${encodeURIComponent(question)}`);
+                let data = await response.json();
+                document.getElementById("result").innerText = "Answer: " + data.answer;
+            }
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
 
 # CORS Middleware
 app.add_middleware(
@@ -59,6 +90,7 @@ async def save_upload_file_temporarily(upload_file: UploadFile) -> str:
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
         raise e
+
 @app.get("/debug-env")
 def debug_env():
     return {"AIPROXY_TOKEN": os.getenv("AIPROXY_TOKEN")}
