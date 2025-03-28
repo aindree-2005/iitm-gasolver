@@ -13,9 +13,18 @@ load_dotenv()
 
 AIPROXY_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6IjIzZjIwMDA5ODNAZHMuc3R1ZHkuaWl0bS5hYy5pbiJ9.LMIj06L44DC3uMCLjw6Of0aLyMlDEHKAGYLLZ86g8_8"
 AIPROXY_BASE_URL = "https://aiproxy.sanand.workers.dev/openai/v1"
-
+from mangum import Mangum  # Required for AWS Lambda/Vercel compatibility
 
 app = FastAPI(title="IITM Assignment API")
+
+@app.get("/")
+def read_root():
+    return {"message": "FastAPI deployed on Vercel"}
+
+# Add this for Vercel compatibility
+handler = Mangum(app)
+
+
 
 # Add CORS middleware
 app.add_middleware(
