@@ -22,15 +22,12 @@ app = FastAPI(title="IITM Assignment API")
 def read_root():
     return {"message": "FastAPI deployed on Vercel"}
 
-# ✅ Support both GET and POST for /api/
-@app.api_route("/api/", methods=["GET", "POST"])
+# ✅ API that supports file uploads & questions
+@app.post("/api/")
 async def process_question(
-    question: Optional[str] = Form(None),  # Allow optional for GET
+    question: str = Form(...),
     file: Optional[UploadFile] = File(None)
 ):
-    if not question:
-        raise HTTPException(status_code=400, detail="Question is required")
-    
     try:
         temp_file_path = None
         if file:
@@ -41,7 +38,7 @@ async def process_question(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ✅ Serve a simple HTML+JS frontend at /web
+# ✅ Serve an HTML+JS frontend at /web
 @app.get("/web", response_class=HTMLResponse)
 async def serve_web():
     html_content = """
@@ -51,18 +48,30 @@ async def serve_web():
         <title>IITM Assignment Solver</title>
     </head>
     <body>
-        <h2>Ask a Question</h2>
-        <input type="text" id="question" placeholder="Enter your question">
-        <button onclick="askAPI()">Submit</button>
+        <h2>Ask a Question with File Upload</h2>
+        <form id="upload-form">
+            <input type="text" id="question" name="question" placeholder="Enter your question" required>
+            <input type="file" id="file" name="file">
+            <button type="submit">Submit</button>
+        </form>
         <p id="result"></p>
 
         <script>
-            async function askAPI() {
-                let question = document.getElementById("question").value;
-                let response = await fetch(`/api/?question=${encodeURIComponent(question)}`);
+            document.getElementById("upload-form").onsubmit = async function(event) {
+                event.preventDefault();
+                let formData = new FormData();
+                formData.append("question", document.getElementById("question").value);
+                let fileInput = document.getElementById("file").files[0];
+                if (fileInput) formData.append("file", fileInput);
+
+                let response = await fetch("/api/", {
+                    method: "POST",
+                    body: formData
+                });
+
                 let data = await response.json();
-                document.getElementById("result").innerText = "Answer: " + data.answer;
-            }
+                document.getElementById("result").innerText = "Answer: " + (data.answer || data.detail);
+            };
         </script>
     </body>
     </html>
