@@ -57,6 +57,9 @@ async def save_upload_file_temporarily(upload_file: UploadFile) -> str:
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
         raise e
+@app.get("/debug-env")
+def debug_env():
+    return {"AIPROXY_TOKEN": os.getenv("AIPROXY_TOKEN")}
 
 # Vercel compatibility (Place at the bottom)
 handler = Mangum(app)
