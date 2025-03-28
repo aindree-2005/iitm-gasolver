@@ -13,6 +13,7 @@ httpx==0.28.1
 idna==3.10
 jiter==0.9.0
 numpy>=1.26.4
+Pillow
 openai==1.67.0
 pandas==2.2.3
 pydantic==2.10.6
