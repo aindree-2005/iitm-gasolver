@@ -1134,26 +1134,13 @@ async def get_openai_response(question: str, file_path: Optional[str] = None) ->
             "type": "function",
             "function": {
                 "name": "reconstruct_scrambled_image",
-                "description": "Reconstruct an image from scrambled pieces using a mapping",
+                "description": "Returns the path to the unscrambled image",
                 "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "image_path": {
-                            "type": "string",
-                            "description": "Path to the scrambled image",
-                        },
-                        "mapping_data": {
-                            "type": "string",
-                            "description": "String containing the mapping data (tab or space separated)",
-                        },
-                        "output_path": {
-                            "type": "string",
-                            "description": "Path to save the reconstructed image (optional)",
-                        },
-                    },
-                    "required": ["image_path", "mapping_data"],
-                },
-            },
+                "type": "object",
+                "properties": {},
+                "required": []
+                }
+            }
         },
     ]
 
